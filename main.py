@@ -75,10 +75,67 @@ def generate_speech_samples(headlines):
         audio_write(title_response, titles[ind])
         audio_write(desrip_response, descriptions[ind])
 
+def combine_title_and_descriptions(headlines):
+    num_of_headlines = len(headlines['articles'])
+    title_files = [os.path.join(os.getcwd(), "title_"+str(i) +'.mp3') for i in range(num_of_headlines)]
+    descrip_files = [os.path.join(os.getcwd(), "description_"+str(i) +'.mp3') for i in range(num_of_headlines)]
+
+    for i in range(num_of_headlines):
+
+        # sound of the title
+        title_sound = AudioSegment.from_file(title_files[i])
+
+        # Get length in milliseconds
+        length = len(title_sound)
+
+        # Space between title and description
+        silent_length = 200
+        # if length < 100:
+        #     silent_length = silent_length + (100-length)
+
+        silent_after_length = AudioSegment.silent(duration=silent_length)
+        
+
+        # # Set fade time
+        # fade_time = int(length * 0.75)
+
+        # # Add fade to title sound
+        # title_sound = title_sound.fade_out(fade_time)
+
+        # Sound of the description
+        descrip_sound = AudioSegment.from_file(descrip_files[i])
+
+        # sound of music
+        song_sound = AudioSegment.from_file("song.mp3")
+
+
+        combined = title_sound+silent_after_length+descrip_sound
+
+        # getting length of combined sound
+        combined_length = len(combined)
+
+        # truncating song length to combined length
+        song_sound = song_sound[20:combined_length+20]
+
+        # reducing the sound of the song
+        song_sound = song_sound - 15
+
+        # sample with sound
+        mixed = combined.overlay(song_sound)
+
+        mixed_title = "sample_"+str(i)+".mp3"
+        mixed.export(mixed_title, format="mp3")
+
+        os.remove(title_files[i])
+        os.remove(descrip_files[i])
+
+
+
 
 if __name__ == '__main__':
     headlines =  get_headlines()
     generate_speech_samples(headlines)
+    combine_title_and_descriptions(headlines)
 
 
 # -------------- Opens Itunes to play the audio --------------------------------------
