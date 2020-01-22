@@ -1,148 +1,74 @@
-from newsapi import NewsApiClient
+import requests
+import json
+from pprint import pprint
+import configparser
 import boto3
-from os import environ
-import io
-import os
-import sys
-import subprocess
-from contextlib import closing
-import pydub
 from pydub import AudioSegment
-from pydub.playback import play
+from datetime import datetime
 
 
-# have to anonymize this later
-KEY = "AKIATZK5PR5YTEKSKP5Q"
-SECRET = "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"
-BUCKET = "snapjot-images"
-REGION = "us-west-2"
+def main():
+    news_byte = AudioSegment.from_mp3('news.mp3')
+    background_music = AudioSegment.from_mp3('song.mp3') - 20
 
-news_api_key="915217c3b0e343039cc3859ff8445d8a"
-S3_KEY = KEY
-S3_SECRET = SECRET
-S3_BUCKET = BUCKET
-S3_REGION = REGION
+    output = news_byte.overlay(background_music, position=1000)
+    today = str(datetime.today().strftime('%m-%d-%Y'))
+    output.export('news_byte_' + today + '.mp3', format='mp3')
 
 
-# Initializing news api 
-newsapi = NewsApiClient(api_key=news_api_key)
+def get_news_byte():
+    config = configparser.ConfigParser()
+    config.read('config.cfg')
 
-# Setting up Polly
-polly = boto3.client('polly', region_name=S3_REGION, aws_access_key_id=S3_KEY, aws_secret_access_key=S3_SECRET)
+    S3_KEY = config['S3']['KEY']
+    S3_SECRET = config['S3']['SECRET']
+    S3_BUCKET = config['S3']['BUCKET']
+    S3_REGION = config['S3']['REGION']
 
+    url = 'https://newsapi.org/v2/top-headlines?country=us&apiKey=6ec99ad88fd9445aaa725a60436e3eef'
 
-def get_headlines():
+    response = requests.get(url).json()
+    top_ten_headlines = []
+    string_to_translate = ['''Good Morning! Here are the top ten headlines for today.''']
 
-    # Getting the top headlines
-    top_headlines = newsapi.get_top_headlines(language='en', country='us')
+    count = 0
+    for article in response['articles']:
+        if count >= 10:
+            break
 
-    return top_headlines
+        cur_news_obj = {}
 
-# writes the audio to file
-def audio_write(response, name):
-    if "AudioStream" in response:
-        # Note: Closing the stream is important because the service throttles on the
-        # number of parallel connections. Here we are using contextlib.closing to
-        # ensure the close method of the stream object will be called automatically
-        # at the end of the with statement's scope.
-        with closing(response["AudioStream"]) as stream:
-            output = os.path.join(os.getcwd(), name+'.mp3')
-            print(output)
+        title_split = article['title'].split('-')
+        description = article['description']
+        source = title_split[-1].strip()
+        title_split.pop()
+        title = '-'.join(title_split).strip()
 
-            try:
-                # Open a file for writing the output as a binary stream
-                with open(output, "wb") as file:
-                    file.write(stream.read())
-            except IOError as error:
-                # Could not write to file, exit gracefully
-                print(error)
-                sys.exit(-1)
+        if description == '' or title == '' or source == '':
+            continue
 
-    else:
-        # The response didn't contain audio data, exit gracefully
-        print("Could not stream audio")
-        sys.exit(-1)
+        string_to_translate.append('Headline number ' + str(count + 1) + '\n\n\n\n' + title)
+        string_to_translate.append('\n\n\n\n ' + description + '\n\n\n\n')
+        string_to_translate.append('This article was from ' + source + '\n\n\n\n')
+        count += 1
 
-# generates the mp3 from the text files
-def generate_speech_samples(headlines):
-    num_of_headlines = len(headlines['articles'])
-    titles = ["title_"+str(i) for i in range(num_of_headlines)]
-    descriptions = ["description_"+str(i) for i in range(num_of_headlines)]
+    print(''.join(string_to_translate))
 
-    for ind, dic in enumerate(headlines['articles']):
-        title_response = polly.synthesize_speech(Engine='neural', Text=dic['title'], OutputFormat="mp3",  VoiceId="Matthew")
-        desrip_response = polly.synthesize_speech(Engine='neural', Text=dic['description'], OutputFormat="mp3",  VoiceId="Matthew")
-        audio_write(title_response, titles[ind])
-        audio_write(desrip_response, descriptions[ind])
+    polly = boto3.client('polly', region_name=S3_REGION,
+                         aws_access_key_id=S3_KEY,
+                         aws_secret_access_key=S3_SECRET)
 
-def combine_title_and_descriptions(headlines):
-    num_of_headlines = len(headlines['articles'])
-    title_files = [os.path.join(os.getcwd(), "title_"+str(i) +'.mp3') for i in range(num_of_headlines)]
-    descrip_files = [os.path.join(os.getcwd(), "description_"+str(i) +'.mp3') for i in range(num_of_headlines)]
+    response = polly.synthesize_speech(Engine='neural',
+            OutputFormat='mp3', Text=''.join(string_to_translate),
+            VoiceId='Matthew')
 
-    for i in range(num_of_headlines):
-
-        # sound of the title
-        title_sound = AudioSegment.from_file(title_files[i])
-
-        # Get length in milliseconds
-        length = len(title_sound)
-
-        # Space between title and description
-        silent_length = 200
-        # if length < 100:
-        #     silent_length = silent_length + (100-length)
-
-        silent_after_length = AudioSegment.silent(duration=silent_length)
-        
-
-        # # Set fade time
-        # fade_time = int(length * 0.75)
-
-        # # Add fade to title sound
-        # title_sound = title_sound.fade_out(fade_time)
-
-        # Sound of the description
-        descrip_sound = AudioSegment.from_file(descrip_files[i])
-
-        # sound of music
-        song_sound = AudioSegment.from_file("song.mp3")
-
-
-        combined = title_sound+silent_after_length+descrip_sound
-
-        # getting length of combined sound
-        combined_length = len(combined)
-
-        # truncating song length to combined length
-        song_sound = song_sound[20:combined_length+20]
-
-        # reducing the sound of the song
-        song_sound = song_sound - 15
-
-        # sample with sound
-        mixed = combined.overlay(song_sound)
-
-        mixed_title = "sample_"+str(i)+".mp3"
-        mixed.export(mixed_title, format="mp3")
-
-        os.remove(title_files[i])
-        os.remove(descrip_files[i])
-
-
+    file = open('news.mp3', 'wb')
+    file.write(response['AudioStream'].read())
+    file.close()
 
 
 if __name__ == '__main__':
-    headlines =  get_headlines()
-    generate_speech_samples(headlines)
-    combine_title_and_descriptions(headlines)
 
+    get_news_byte()
 
-# -------------- Opens Itunes to play the audio --------------------------------------
-# # Play the audio using the platform's default player
-# if sys.platform == "win32":
-#     os.startfile(output)
-# else:
-#     # The following works on macOS and Linux. (Darwin = mac, xdg-open = linux).
-#     opener = "open" if sys.platform == "darwin" else "xdg-open"
-#     subprocess.call([opener, output])
+    main()
