@@ -8,7 +8,6 @@ from pydub import AudioSegment
 from datetime import datetime
 from newsapi import NewsApiClient
 import os
-from summarizer import summarize
 import smtplib, ssl
 from email import encoders
 from email.mime.text import MIMEText
