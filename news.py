@@ -5,6 +5,7 @@ import configparser
 import boto3
 from pydub import AudioSegment
 from datetime import datetime
+from newsapi import NewsApiClient
 import os
 from summarizer import summarize
 import smtplib, ssl
@@ -33,6 +34,19 @@ MAILING_LIST = ["karthikravi97@gmail.com", "sfeizi97@gmail.com", "shikardhar1234
 
 
 
+acceptable_sources = ['abc-news', 'associated-press', 'bbc-news', 'bleacher-report',
+                      'bloomberg', 'business-insider', 'cbs-news', 'cnbc', 'cnn',
+                      'entertainment-weekly', 'espn', 'fortune', 'google-news', 'national-geographic',
+                      'nbc-news', 'newsweek', 'new-york-magazine', 'politico', 'reuters', 'techcrunch',
+                      'the-hill', 'the-huffington-post', 'the-verge', 'the-wall-street-journal',
+                      'the-washington-post', 'the-washington-times', 'time', 'usa-today', 'vice-news',
+                      'wired']
+
+acceptable_sources_string = ','.join(acceptable_sources)
+
+# news api token
+newsapi = NewsApiClient(api_key='915217c3b0e343039cc3859ff8445d8a')
+
 def main():
        payload = make_news_api_request()
        urls, headlines = extract_minits(payload, True)
@@ -59,12 +73,9 @@ def main():
 
 
 def make_news_api_request():
-       url = ('https://newsapi.org/v2/top-headlines?'
-              'country=us&'
-              'apiKey=6ec99ad88fd9445aaa725a60436e3eef')
-
+       top_headlines = newsapi.get_top_headlines(sources=acceptable_sources_string)
        print('Getting top headlines from news api')
-       return requests.get(url).json()
+       return top_headlines
 
 
 def extract_minits(payload, verbose=False):
@@ -73,13 +84,10 @@ def extract_minits(payload, verbose=False):
        urls = []
 
        print('Pulling title, description, and source from headlines')
-       count = 0
-       for article in payload['articles']:
-              if(count >= HEADLINE_COUNT):
-                     break
-
-              print('Processing headline ' + str(count+1))
-
+       
+       article_load = payload['articles'][:HEADLINE_COUNT]
+       for ind, article in enumerate(article_load):
+              print('Processing headline ' + str(ind+1))
               title_split = article['title'].split('-')
               headlines.append(title_split[0])
               title = '-'.join(title_split[:-1]).strip()
@@ -87,9 +95,6 @@ def extract_minits(payload, verbose=False):
               description = article['description']
               source = title_split[-1].strip()
               urls.append(article['url'])
-
-              if(title == '' or description == '' or source == ''):
-                     continue
 
               if(verbose):
                      print()
@@ -108,10 +113,7 @@ def extract_minits(payload, verbose=False):
               cur_headline += title
               cur_headline += '\n\n\n ' + description + '\n\n\n'
 
-
               headlines_to_convert.append(cur_headline)
-
-              count += 1
 
        print('Converting text to speech')
        count = 0
