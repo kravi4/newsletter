@@ -18,7 +18,7 @@ from email.mime.base import MIMEBase
 HEADLINE_COUNT = 10
 WELCOME_FILENAME = 'welcome.mp3'
 GOODBYE_FILENAME = 'goodbye.mp3'
-WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are todays headlines\n\n\n'
+WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for ' + str(datetime.today().strftime('%A %B %d')) + '\n\n\n'
 GOODBYE_MESSAGE = 'This concludes your morning minutes. Have a nice day and see you again tomorrow!'
 
 config = configparser.ConfigParser()
@@ -112,7 +112,7 @@ def extract_minits(payload, verbose=False):
               cur_headline += title
               cur_headline += '\n\n\n ' + description + '\n\n\n'
 
-              headlines_to_convert = headlines_to_convert.append(cur_headline)
+              headlines_to_convert.append(cur_headline)
 
        print('Converting text to speech')
        count = 0
