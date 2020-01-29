@@ -84,7 +84,7 @@ def extract_minits(payload, verbose=False):
        urls = []
 
        print('Pulling title, description, and source from headlines')
-       
+
        article_load = payload['articles'][:HEADLINE_COUNT]
        for ind, article in enumerate(article_load):
               print('Processing headline ' + str(ind+1))
@@ -104,16 +104,15 @@ def extract_minits(payload, verbose=False):
                      print(article['source'])
                      print()
 
-              if('.com' in source):
-                     print('Source from title: ' + source)
-                     source = article['source']['name']
-                     print('Source: ' + source)
+              print('Source from title: ' + source)
+              source = article['source']['name']
+              print('Source: ' + source)
 
               cur_headline = 'From ' + source + '\n\n\n'
               cur_headline += title
               cur_headline += '\n\n\n ' + description + '\n\n\n'
 
-              headlines_to_convert.append(cur_headline)
+              headlines_to_convert = headlines_to_convert.append(cur_headline)
 
        print('Converting text to speech')
        count = 0
