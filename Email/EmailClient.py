@@ -1,3 +1,4 @@
+import sys
 import smtplib, ssl
 from email import encoders
 from email.mime.text import MIMEText
@@ -6,7 +7,7 @@ from email.mime.base import MIMEBase
 
 senderEmail = "morningminits@gmail.com"
 receiverEmailList = ["karthikravi97@gmail.com", "sfeizi97@gmail.com", "shikardhar12345@gmail.com", "skunal8197@gmail.com", "sidvashist@gmail.com", "kishora1997@gmail.com"]
-password = "jotit123"
+password = input("Enter password for morningminits@gmail.com:")
 
 subject = "Morning Minits"
 
