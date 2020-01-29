@@ -6,6 +6,12 @@ import boto3
 from pydub import AudioSegment
 from datetime import datetime
 import os
+from summarizer import summarize
+import smtplib, ssl
+from email import encoders
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
 
 
 HEADLINE_COUNT = 10
@@ -22,10 +28,14 @@ S3_SECRET = config['S3']['SECRET']
 S3_BUCKET = config['S3']['BUCKET']
 S3_REGION = config['S3']['REGION']
 
+SENDER_EMAIL = "morningminits@gmail.com"
+MAILING_LIST = ["karthikravi97@gmail.com", "sfeizi97@gmail.com", "shikardhar12345@gmail.com", "skunal8197@gmail.com", "sidvashist@gmail.com", "kishora1997@gmail.com"]
+
+
 
 def main():
        payload = make_news_api_request()
-       urls = extract_minits(payload, True)
+       urls, headlines = extract_minits(payload, True)
 
        create_welcome_goodbye()
        print('Joining individual files to make morning minits')
@@ -40,12 +50,12 @@ def main():
        output = truncate_audio(output, 0, 25)
 
        today = str(datetime.today().strftime('%m-%d-%Y'))
-       output.export('morning_minits_' + today + '.mp3', format='mp3')
+
+       outputFileName = str('morning_minits_' + today + '.mp3')
+       output.export(outputFileName, format='mp3')
 
        delete_audio_files()
-       email_text = create_email_text(urls)
-       print()
-       print(email_text)
+       send_emails(MAILING_LIST, urls, headlines, outputFileName)
 
 
 def make_news_api_request():
@@ -59,6 +69,7 @@ def make_news_api_request():
 
 def extract_minits(payload, verbose=False):
        headlines_to_convert = []
+       headlines = []
        urls = []
 
        print('Pulling title, description, and source from headlines')
@@ -66,10 +77,11 @@ def extract_minits(payload, verbose=False):
        for article in payload['articles']:
               if(count >= HEADLINE_COUNT):
                      break
-              
+
               print('Processing headline ' + str(count+1))
 
               title_split = article['title'].split('-')
+              headlines.append(title_split[0])
               title = '-'.join(title_split[:-1]).strip()
 
               description = article['description']
@@ -95,8 +107,8 @@ def extract_minits(payload, verbose=False):
               cur_headline = 'From ' + source + '\n\n\n'
               cur_headline += title
               cur_headline += '\n\n\n ' + description + '\n\n\n'
-              
-              
+
+
               headlines_to_convert.append(cur_headline)
 
               count += 1
@@ -106,7 +118,7 @@ def extract_minits(payload, verbose=False):
        voice = ''
        for headline in headlines_to_convert:
               print('Processing headline ' + str(count+1))
-              
+
               if(count % 2 == 1):
                      voice = 'Matthew'
 
@@ -115,21 +127,86 @@ def extract_minits(payload, verbose=False):
 
               response = run_polly(voice, headline)
               create_response_file('headline' + str(count) + '.mp3', response)
-              
+
               count += 1
 
-       return urls
+       return urls, headlines
 
 
-def create_email_text(urls):
-       print('Creating email text')
-       email_text = ['Hope you enjoyed the Morning Minits! You can find the links to the articles referenced in the minits below for further reading.\n\n']
-       count = 0
-       for url in urls:
-              email_text.append('Article ' + str(count+1) + ': ' + url + '\n\n')
-              count += 1
+def send_emails(receiverEmailList, articleUrls, articleHeadlines, filename):
+    password = input("Enter password for morningminits@gmail.com:")
 
-       return ''.join(email_text)
+    print("Creating emails")
+
+    subject = "Morning Minits"
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = SENDER_EMAIL
+
+    html = """\
+    <html>
+      <body>
+        <img src="https://minits-setup.s3-us-west-2.amazonaws.com/banner1.png" >
+        <p>
+            <br>
+
+            <p> </p>
+            <a href={LINK_1} ><center> {HEADLINE_1} </center></a> <br>
+            <a href={LINK_2} ><center> {HEADLINE_2} </center></a> <br>
+            <a href={LINK_3} ><center> {HEADLINE_3} </center></a> <br>
+            <a href={LINK_4} ><center> {HEADLINE_4} </center></a> <br>
+            <a href={LINK_5} ><center> {HEADLINE_5} </center></a> <br>
+            <a href={LINK_6} ><center> {HEADLINE_6} </center></a> <br>
+            <a href={LINK_7} ><center> {HEADLINE_7} </center></a> <br>
+            <a href={LINK_8} ><center> {HEADLINE_8} </center></a> <br>
+            <a href={LINK_9} ><center> {HEADLINE_9} </center></a> <br>
+            <a href={LINK_10} ><center> {HEADLINE_10} </center></a> <br>
+
+        </p>
+      </body>
+    </html>
+    """
+
+    for i in range(10):
+        linkPlaceholder = '{LINK_' + str(i+1) + '}'
+        headlinePlaceholder = '{HEADLINE_' + str(i+1) + '}'
+
+        linkActual = str("\"" + str(articleUrls[i]) + "\"")
+        headlineActual = str(articleHeadlines[i])
+
+        html = html.replace(linkPlaceholder, linkActual)
+        html = html.replace(headlinePlaceholder, headlineActual)
+
+    part1 = MIMEText(html, "html")
+
+    attachment = open(filename, "rb")
+    part2 = MIMEBase("application", "octet-stream")
+    part2.set_payload(attachment.read())
+
+    # Encode file in ASCII characters to send by email
+    encoders.encode_base64(part2)
+
+    # Add header as key/value pair to attachment part
+    part2.add_header(
+        "Content-Disposition",
+        "attachment; filename= " + filename,
+    )
+
+    message.attach(part1)
+    message.attach(part2)
+
+    print("Sending emails")
+
+    # Create secure connection with server and send email
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(SENDER_EMAIL, password)
+        for receiverEmail in receiverEmailList:
+            message["To"] = receiverEmail
+            server.sendmail(
+                SENDER_EMAIL, receiverEmail, message.as_string()
+            )
 
 
 def create_welcome_goodbye():
@@ -144,7 +221,7 @@ def create_welcome_goodbye():
 
 def run_polly(voice, text):
        polly = boto3.client('polly', region_name=S3_REGION, aws_access_key_id=S3_KEY, aws_secret_access_key=S3_SECRET)
-       
+
        return polly.synthesize_speech(
               Engine = 'neural',
               OutputFormat = 'mp3',
