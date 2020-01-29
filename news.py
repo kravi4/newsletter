@@ -1,4 +1,5 @@
 import requests
+import csv
 import json
 from pprint import pprint
 import configparser
@@ -30,9 +31,8 @@ S3_BUCKET = config['S3']['BUCKET']
 S3_REGION = config['S3']['REGION']
 
 SENDER_EMAIL = "morningminits@gmail.com"
-MAILING_LIST = ["karthikravi97@gmail.com", "sfeizi97@gmail.com", "shikardhar12345@gmail.com", "skunal8197@gmail.com", "sidvashist@gmail.com", "kishora1997@gmail.com"]
 
-
+MAILING_LIST = "mailinglist.csv"
 
 acceptable_sources = ['abc-news', 'associated-press', 'bbc-news', 'bleacher-report',
                       'bloomberg', 'business-insider', 'cbs-news', 'cnbc', 'cnn',
@@ -50,6 +50,12 @@ newsapi = NewsApiClient(api_key='915217c3b0e343039cc3859ff8445d8a')
 def main():
        payload = make_news_api_request()
        urls, headlines = extract_minits(payload, True)
+
+       receiverEmailList = []
+       with open(MAILING_LIST) as csvfile:
+           receiverEmailList = list(csv.reader(csvfile))# change contents to float
+
+       print("Creating an email for: " + str(receiverEmailList))
 
        create_welcome_goodbye()
        print('Joining individual files to make morning minits')
@@ -69,7 +75,7 @@ def main():
        output.export(outputFileName, format='mp3')
 
        delete_audio_files()
-       send_emails(MAILING_LIST, urls, headlines, outputFileName)
+       send_emails(receiverEmailList, urls, headlines, outputFileName)
 
 
 def make_news_api_request():
@@ -204,7 +210,7 @@ def send_emails(receiverEmailList, articleUrls, articleHeadlines, filename):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(SENDER_EMAIL, password)
         for receiverEmail in receiverEmailList:
-            message["To"] = receiverEmail
+            message["To"] = receiverEmail[0]
             server.sendmail(
                 SENDER_EMAIL, receiverEmail, message.as_string()
             )
