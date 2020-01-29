@@ -5,7 +5,7 @@ import configparser
 import boto3
 from pydub import AudioSegment
 from datetime import datetime
-import newsapi
+from newsapi import NewsApiClient
 import os
 
 
@@ -23,6 +23,19 @@ S3_SECRET = config['S3']['SECRET']
 S3_BUCKET = config['S3']['BUCKET']
 S3_REGION = config['S3']['REGION']
 
+
+acceptable_sources = ['abc-news', 'associated-press', 'bbc-news', 'bleacher-report', 
+                      'bloomberg', 'business-insider', 'cbs-news', 'cnbc', 'cnn', 
+                      'entertainment-weekly', 'espn', 'fortune', 'google-news', 'national-geographic', 
+                      'nbc-news', 'newsweek', 'new-york-magazine', 'politico', 'reuters', 'techcrunch', 
+                      'the-hill', 'the-huffington-post', 'the-verge', 'the-wall-street-journal', 
+                      'the-washington-post', 'the-washington-times', 'time', 'usa-today', 'vice-news', 
+                      'wired']
+
+acceptable_sources_string = ','.join(acceptable_sources)
+
+# news api token
+newsapi = NewsApiClient(api_key='915217c3b0e343039cc3859ff8445d8a')
 
 def main():
        payload = make_news_api_request()
@@ -50,10 +63,9 @@ def main():
 
 
 def make_news_api_request():
-       url = ('https://newsapi.org/v2/top-headlines?sources=abc-news,associated-press,bbc-news,bleacher-report,bloomberg,business-insider,cbs-news,cnbc,cnn,entertainment-weekly,espn,fortune,google-news,national-geographic,nbc-news,newsweek,new-york-magazine,politico,reuters,techcrunch,the-hill,the-huffington-post,the-verge,the-wall-street-journal,the-washington-post,the-washington-times,time,usa-today,vice-news,wired&apiKey=6ec99ad88fd9445aaa725a60436e3eef')
-
+       top_headlines = newsapi.get_top_headlines(sources=acceptable_sources_string)
        print('Getting top headlines from news api')
-       return requests.get(url).json()
+       return top_headlines
 
 
 def extract_minits(payload, verbose=False):
