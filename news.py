@@ -25,7 +25,7 @@ S3_REGION = config['S3']['REGION']
 
 def main():
        payload = make_news_api_request()
-       urls = extract_minits(payload)
+       urls = extract_minits(payload, True)
 
        create_welcome_goodbye()
        print('Joining individual files to make morning minits')
@@ -87,9 +87,15 @@ def extract_minits(payload, verbose=False):
                      print(article['source'])
                      print()
 
-              cur_headline = title
+              if('.com' in source):
+                     print('Source from title: ' + source)
+                     source = article['source']['name']
+                     print('Source: ' + source)
+
+              cur_headline = 'From ' + source + '\n\n\n'
+              cur_headline += title
               cur_headline += '\n\n\n ' + description + '\n\n\n'
-              cur_headline += 'This article was from ' + source + '\n\n\n'
+              
               
               headlines_to_convert.append(cur_headline)
 
