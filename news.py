@@ -18,7 +18,8 @@ from email.mime.base import MIMEBase
 HEADLINE_COUNT = 10
 WELCOME_FILENAME = 'welcome.mp3'
 GOODBYE_FILENAME = 'goodbye.mp3'
-WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for ' + str(datetime.today().strftime('%A %B %d')) + '\n\n\n'
+#WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for ' + str(datetime.today().strftime('%A %B %d')) + '\n\n\n'
+WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for Thursday, January 30th'
 GOODBYE_MESSAGE = 'This concludes your morning minutes. Have a nice day and see you again tomorrow!'
 
 config = configparser.ConfigParser()
@@ -64,13 +65,13 @@ def main():
               morning_minits += AudioSegment.from_mp3('headline' + str(i) + '.mp3')
 
        morning_minits += AudioSegment.from_mp3(GOODBYE_FILENAME)
-       background_music = AudioSegment.from_mp3('background.mp3') - 25
+       background_music = AudioSegment.from_mp3('newsmusic.mp3') -25
        output = background_music.overlay(morning_minits, position=3000)
-       output = truncate_audio(output, 0, 25)
+       output = truncate_audio(output, 0, 45)
 
        today = str(datetime.today().strftime('%m-%d-%Y'))
 
-       outputFileName = str('morning_minits_' + today + '.mp3')
+       outputFileName = str('todays_minits'+ '.mp3')
        output.export(outputFileName, format='mp3')
 
        delete_audio_files()
