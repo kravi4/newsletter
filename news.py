@@ -6,7 +6,7 @@ import configparser
 import boto3
 from pydub import AudioSegment
 from datetime import datetime
-from newsapi.newsapi_client import NewsApiClient
+from newsapi import NewsApiClient
 import os
 import smtplib, ssl
 from email import encoders
@@ -15,11 +15,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 
 
-HEADLINE_COUNT = 8
+HEADLINE_COUNT = 10
 WELCOME_FILENAME = 'welcome.mp3'
 GOODBYE_FILENAME = 'goodbye.mp3'
 #WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for ' + str(datetime.today().strftime('%A %B %d')) + '\n\n\n'
-WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for Friday, January 31st'
+WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for Thursday, January 30th'
 GOODBYE_MESSAGE = 'This concludes your morning minutes. Have a nice day and see you again tomorrow!'
 
 config = configparser.ConfigParser()
@@ -49,7 +49,7 @@ newsapi = NewsApiClient(api_key='915217c3b0e343039cc3859ff8445d8a')
 
 def main():
        payload = make_news_api_request()
-       urls, headlines = extract_minits(payload, False)
+       urls, headlines = extract_minits(payload, True)
 
        receiverEmailList = []
        with open(MAILING_LIST) as csvfile:
@@ -62,13 +62,12 @@ def main():
        morning_minits = AudioSegment.from_mp3(WELCOME_FILENAME)
 
        for i in range(HEADLINE_COUNT):
-              morning_minits += AudioSegment.from_mp3('source' + str(i) + '.mp3')
               morning_minits += AudioSegment.from_mp3('headline' + str(i) + '.mp3')
 
        morning_minits += AudioSegment.from_mp3(GOODBYE_FILENAME)
-       background_music = AudioSegment.from_mp3('newsmusic.mp3') - 25
+       background_music = AudioSegment.from_mp3('newsmusic.mp3') -25
        output = background_music.overlay(morning_minits, position=3000)
-       output = truncate_audio(output, 0, 20)
+       output = truncate_audio(output, 0, 45)
 
        today = str(datetime.today().strftime('%m-%d-%Y'))
 
@@ -76,7 +75,7 @@ def main():
        output.export(outputFileName, format='mp3')
 
        delete_audio_files()
-       # send_emails(receiverEmailList, urls, headlines, outputFileName)
+       send_emails(receiverEmailList, urls, headlines, outputFileName)
 
 
 def make_news_api_request():
@@ -87,8 +86,7 @@ def make_news_api_request():
 
 def extract_minits(payload, verbose=False):
        headlines_to_convert = []
-       sources_to_convert = []
-       titles = []
+       headlines = []
        urls = []
 
        print('Pulling title, description, and source from headlines')
@@ -97,7 +95,7 @@ def extract_minits(payload, verbose=False):
        for ind, article in enumerate(article_load):
               print('Processing headline ' + str(ind+1))
               title_split = article['title'].split('-')
-              titles.append(title_split[0])
+              headlines.append(title_split[0])
               title = '-'.join(title_split[:-1]).strip()
 
               description = article['description']
@@ -116,34 +114,30 @@ def extract_minits(payload, verbose=False):
               source = article['source']['name']
               print('Source: ' + source)
 
-              cur_source = 'From ' + source + '\n\n\n'
-              cur_headline = title
+              cur_headline = 'From ' + source + '\n\n\n'
+              cur_headline += title
               cur_headline += '\n\n\n ' + description + '\n\n\n'
 
               headlines_to_convert.append(cur_headline)
-              sources_to_convert.append(cur_source)
 
        print('Converting text to speech')
-
        count = 0
+       voice = ''
        for headline in headlines_to_convert:
               print('Processing headline ' + str(count+1))
 
-              response = run_polly("Matthew", headline)
+              if(count % 2 == 1):
+                     voice = 'Matthew'
+
+              else:
+                     voice = 'Joanna'
+
+              response = run_polly(voice, headline)
               create_response_file('headline' + str(count) + '.mp3', response)
 
               count += 1
 
-       count = 0
-       for source in sources_to_convert:
-              print('Processing source ' + str(count+1))
-
-              response = run_polly("Joanna", source)
-              create_response_file('source' + str(count) + '.mp3', response)
-
-              count += 1
-
-       return urls, titles
+       return urls, headlines
 
 
 def send_emails(receiverEmailList, articleUrls, articleHeadlines, filename):
@@ -254,18 +248,12 @@ def delete_audio_files():
        for i in range(HEADLINE_COUNT):
               os.remove('headline' + str(i) + '.mp3')
 
-       for i in range(HEADLINE_COUNT):
-              os.remove('source' + str(i) + '.mp3')
-
        os.remove(WELCOME_FILENAME)
        os.remove(GOODBYE_FILENAME)
 
 
-def truncate_audio(audio, minutes, seconds):
-       if(minutes == 0 and seconds == 0):
-              return audio
-
-       end_time = (minutes*60*1000+seconds*1000) * -1
+def truncate_audio(audio, min, sec):
+       end_time = (min*60*1000+sec*1000) * -1
        return audio[:end_time]
 
 
