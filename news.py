@@ -585,9 +585,9 @@ def send_emails(receiverEmailList, articleUrls, articleHeadlines, articleImages,
     """
 
     for i in range(10):
-        linkPlaceholder = '{LINK_' + str(i+1) + '}'
-        headlinePlaceholder = '{HEADLINE_' + str(i+1) + '}'
-        imagePlaceholder = '{IMAGE_' + str(i+1) + '}'
+        linkPlaceholder = '{LINK_' + str(i) + '}'
+        headlinePlaceholder = '{HEADLINE_' + str(i) + '}'
+        imagePlaceholder = '{IMAGE_' + str(i) + '}'
         datePlaceholder = '{DATE}'
 
         linkActual = str("\"" + str(articleUrls[i]) + "\"")
