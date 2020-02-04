@@ -5,7 +5,7 @@ from pprint import pprint
 import configparser
 import boto3
 from pydub import AudioSegment
-from datetime import datetime
+from datetime import datetime, timedelta
 from newsapi import NewsApiClient
 import os
 import smtplib, ssl
@@ -18,8 +18,8 @@ from email.mime.base import MIMEBase
 HEADLINE_COUNT = 10
 WELCOME_FILENAME = 'welcome.mp3'
 GOODBYE_FILENAME = 'goodbye.mp3'
-#WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for ' + str(datetime.today().strftime('%A %B %d')) + '\n\n\n'
-WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for Thursday, January 30th'
+WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for ' + str((datetime.today() + timedelta(days=1)).strftime('%A %B %d')) + '\n\n\n'
+# WELCOME_MESSAGE = 'Good Morning! And welcome to your morning minutes. Here are the top headlines for Tuesday, February 4th'
 GOODBYE_MESSAGE = 'This concludes your morning minutes. Have a nice day and see you again tomorrow!'
 
 config = configparser.ConfigParser()
@@ -39,8 +39,7 @@ acceptable_sources = ['abc-news', 'associated-press', 'bbc-news', 'bleacher-repo
                       'entertainment-weekly', 'espn', 'fortune', 'google-news', 'national-geographic',
                       'nbc-news', 'newsweek', 'new-york-magazine', 'politico', 'reuters', 'techcrunch',
                       'the-hill', 'the-huffington-post', 'the-verge', 'the-wall-street-journal',
-                      'the-washington-post', 'the-washington-times', 'time', 'usa-today', 'vice-news',
-                      'wired']
+                      'the-washington-times', 'time', 'usa-today', 'vice-news', 'wired']
 
 acceptable_sources_string = ','.join(acceptable_sources)
 
@@ -49,7 +48,12 @@ newsapi = NewsApiClient(api_key='915217c3b0e343039cc3859ff8445d8a')
 
 def main():
        payload = make_news_api_request()
-       urls, headlines = extract_minits(payload, True)
+       extract = extract_minits(payload, True)
+       urls = extract[0]
+       headlines = extract[1]
+       imageUrls = extract[2]
+
+       print(imageUrls)
 
        receiverEmailList = []
        with open(MAILING_LIST) as csvfile:
@@ -75,7 +79,7 @@ def main():
        output.export(outputFileName, format='mp3')
 
        delete_audio_files()
-       send_emails(receiverEmailList, urls, headlines, outputFileName)
+       send_emails(receiverEmailList, urls, headlines, imageUrls, outputFileName)
 
 
 def make_news_api_request():
@@ -88,6 +92,7 @@ def extract_minits(payload, verbose=False):
        headlines_to_convert = []
        headlines = []
        urls = []
+       images = []
 
        print('Pulling title, description, and source from headlines')
 
@@ -101,6 +106,7 @@ def extract_minits(payload, verbose=False):
               description = article['description']
               source = title_split[-1].strip()
               urls.append(article['url'])
+              images.append(article['urlToImage'])
 
               if(verbose):
                      print()
@@ -137,10 +143,10 @@ def extract_minits(payload, verbose=False):
 
               count += 1
 
-       return urls, headlines
+       return [urls, headlines, images]
 
 
-def send_emails(receiverEmailList, articleUrls, articleHeadlines, filename):
+def send_emails(receiverEmailList, articleUrls, articleHeadlines, articleImages, filename):
     password = input("Enter password for morningminits@gmail.com:")
 
     print("Creating emails")
@@ -152,38 +158,446 @@ def send_emails(receiverEmailList, articleUrls, articleHeadlines, filename):
     message["From"] = SENDER_EMAIL
 
     html = """\
-    <html>
-      <body>
-        <img src="https://minits-setup.s3-us-west-2.amazonaws.com/banner1.png" >
-        <p>
-            <br>
+    <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+    <head>
+        <meta charset="utf-8"> <!-- utf-8 works for most cases -->
+        <meta name="viewport" content="width=device-width"> <!-- Forcing initial-scale shouldn't be necessary -->
+        <meta http-equiv="X-UA-Compatible" content="IE=edge"> <!-- Use the latest (edge) version of IE rendering engine -->
+        <meta name="x-apple-disable-message-reformatting">  <!-- Disable auto-scale in iOS 10 Mail entirely -->
+        <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no"> <!-- Tell iOS not to automatically link certain text strings. -->
+        <title></title> <!-- The title tag shows in email notifications, like Android 4.4. -->
 
-            <p> </p>
-            <a href={LINK_1} ><center> {HEADLINE_1} </center></a> <br>
-            <a href={LINK_2} ><center> {HEADLINE_2} </center></a> <br>
-            <a href={LINK_3} ><center> {HEADLINE_3} </center></a> <br>
-            <a href={LINK_4} ><center> {HEADLINE_4} </center></a> <br>
-            <a href={LINK_5} ><center> {HEADLINE_5} </center></a> <br>
-            <a href={LINK_6} ><center> {HEADLINE_6} </center></a> <br>
-            <a href={LINK_7} ><center> {HEADLINE_7} </center></a> <br>
-            <a href={LINK_8} ><center> {HEADLINE_8} </center></a> <br>
-            <a href={LINK_9} ><center> {HEADLINE_9} </center></a> <br>
-            <a href={LINK_10} ><center> {HEADLINE_10} </center></a> <br>
+        <!-- Web Font / @font-face : BEGIN -->
+        <!-- NOTE: If web fonts are not required, lines 10 - 27 can be safely removed. -->
 
-        </p>
-      </body>
+        <!-- Desktop Outlook chokes on web font references and defaults to Times New Roman, so we force a safe fallback font. -->
+        <!--[if mso]>
+            <style>
+                * {
+                    font-family: sans-serif !important;
+                }
+            </style>
+        <![endif]-->
+
+        <!-- All other clients get the webfont reference; some will render the font and others will silently fail to the fallbacks. More on that here: http://stylecampaign.com/blog/2015/02/webfont-support-in-email/ -->
+        <!--[if !mso]><!-->
+        <!-- insert web font reference, eg: <link href='https://fonts.googleapis.com/css?family=Roboto:400,700' rel='stylesheet' type='text/css'> -->
+        <!--<![endif]-->
+
+        <!-- Web Font / @font-face : END -->
+
+        <!-- CSS Reset : BEGIN -->
+        <style>
+
+            /* What it does: Remove spaces around the email design added by some email clients. */
+            /* Beware: It can remove the padding / margin and add a background color to the compose a reply window. */
+            html,
+            body {
+                margin: 0 auto !important;
+                padding: 0 !important;
+                height: 100% !important;
+                width: 100% !important;
+            }
+
+            /* What it does: Stops email clients resizing small text. */
+            * {
+                -ms-text-size-adjust: 100%;
+                -webkit-text-size-adjust: 100%;
+            }
+
+            /* What it does: Centers email on Android 4.4 */
+            div[style*="margin: 16px 0"] {
+                margin: 0 !important;
+            }
+
+            /* What it does: forces Samsung Android mail clients to use the entire viewport */
+            #MessageViewBody, #MessageWebViewDiv{
+                width: 100% !important;
+            }
+
+            /* What it does: Stops Outlook from adding extra spacing to tables. */
+            table,
+            td {
+                mso-table-lspace: 0pt !important;
+                mso-table-rspace: 0pt !important;
+            }
+
+            /* What it does: Fixes webkit padding issue. */
+            table {
+                border-spacing: 0 !important;
+                border-collapse: collapse !important;
+                table-layout: fixed !important;
+                margin: 0 auto !important;
+            }
+
+            /* What it does: Uses a better rendering method when resizing images in IE. */
+            img {
+                -ms-interpolation-mode:bicubic;
+            }
+
+            /* What it does: Prevents Windows 10 Mail from underlining links despite inline CSS. Styles for underlined links should be inline. */
+            a {
+                text-decoration: none;
+            }
+
+            /* What it does: A work-around for email clients meddling in triggered links. */
+            a[x-apple-data-detectors],  /* iOS */
+            .unstyle-auto-detected-links a,
+            .aBn {
+                border-bottom: 0 !important;
+                cursor: default !important;
+                color: inherit !important;
+                text-decoration: none !important;
+                font-size: inherit !important;
+                font-family: inherit !important;
+                font-weight: inherit !important;
+                line-height: inherit !important;
+            }
+
+            /* What it does: Prevents Gmail from displaying a download button on large, non-linked images. */
+            .a6S {
+                display: none !important;
+                opacity: 0.01 !important;
+            }
+
+            /* What it does: Prevents Gmail from changing the text color in conversation threads. */
+            .im {
+                color: inherit !important;
+            }
+
+            /* If the above doesn't work, add a .g-img class to any image in question. */
+            img.g-img + div {
+                display: none !important;
+            }
+
+            /* What it does: Removes right gutter in Gmail iOS app: https://github.com/TedGoas/Cerberus/issues/89  */
+            /* Create one of these media queries for each additional viewport size you'd like to fix */
+
+            /* iPhone 4, 4S, 5, 5S, 5C, and 5SE */
+            @media only screen and (min-device-width: 320px) and (max-device-width: 374px) {
+                u ~ div .email-container {
+                    min-width: 320px !important;
+                }
+            }
+            /* iPhone 6, 6S, 7, 8, and X */
+            @media only screen and (min-device-width: 375px) and (max-device-width: 413px) {
+                u ~ div .email-container {
+                    min-width: 375px !important;
+                }
+            }
+            /* iPhone 6+, 7+, and 8+ */
+            @media only screen and (min-device-width: 414px) {
+                u ~ div .email-container {
+                    min-width: 414px !important;
+                }
+            }
+
+        </style>
+
+        <!-- What it does: Makes background images in 72ppi Outlook render at correct size. -->
+        <!--[if gte mso 9]>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+        <![endif]-->
+
+        <!-- CSS Reset : END -->
+
+        <!-- Progressive Enhancements : BEGIN -->
+        <style>
+
+    	    /* What it does: Hover styles for buttons */
+    	    .button-td,
+    	    .button-a {
+    	        transition: all 100ms ease-in;
+    	    }
+    	    .button-td-primary:hover,
+    	    .button-a-primary:hover {
+    	        background: #555555 !important;
+    	        border-color: #555555 !important;
+    	    }
+
+    	    /* Media Queries */
+    	    @media screen and (max-width: 600px) {
+
+    	        /* What it does: Adjust typography on small screens to improve readability */
+    	        .email-container p {
+    	            font-size: 17px !important;
+    	        }
+
+    	    }
+
+        </style>
+        <!-- Progressive Enhancements : END -->
+
+    </head>
+    <!--
+    	The email background color (#FFFFFF) is defined in three places:
+    	1. body tag: for most email clients
+    	2. center tag: for Gmail and Inbox mobile apps and web versions of Gmail, GSuite, Inbox, Yahoo, AOL, Libero, Comcast, freenet, Mail.ru, Orange.fr
+    	3. mso conditional: For Windows 10 Mail
+    -->
+    <body width="100%" style="margin: 0; padding: 0 !important; mso-line-height-rule: exactly; background-color: #FFFFFF;">
+    	<center style="width: 100%; background-color: #FFFFFF;">
+        <!--[if mso | IE]>
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFFFFF;">
+        <tr>
+        <td>
+        <![endif]-->
+
+            <!-- Visually Hidden Preheader Text : BEGIN -->
+            <!-- <div style="display: none; font-size: 1px; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all; font-family: sans-serif;">
+                (Optional) This text will appear in the inbox preview, but not the email body. It can be used to supplement the email subject line or even summarize the email's contents. Extended text preheaders (~490 characters) seems like a better UX for anyone using a screenreader or voice-command apps like Siri to dictate the contents of an email. If this text is not included, email clients will automatically populate it using the text (including image alt text) at the start of the email's body.
+            </div> -->
+            <!-- Visually Hidden Preheader Text : END -->
+
+            <!-- Create white space after the desired preview text so email clients don’t pull other distracting text into the inbox preview. Extend as necessary. -->
+            <!-- Preview Text Spacing Hack : BEGIN -->
+            <div style="display: none; font-size: 1px; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all; font-family: sans-serif;">
+    	        &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+            </div>
+            <!-- Preview Text Spacing Hack : END -->
+
+            <!--
+                Set the email width. Defined in two places:
+                1. max-width for all clients except Desktop Windows Outlook, allowing the email to squish on narrow but never go wider than 600px.
+                2. MSO tags for Desktop Windows Outlook enforce a 600px width.
+            -->
+            <div style="max-width: 600px; margin: 0 auto;" class="email-container">
+                <!--[if mso]>
+                <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600">
+                <tr>
+                <td>
+                <![endif]-->
+
+    	        <!-- Email Body : BEGIN -->
+    	        <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: auto;">
+                    <!-- Hero Image, Flush : BEGIN -->
+                    <tr>
+                            <img src="https://minits-setup.s3-us-west-2.amazonaws.com/banner1.png" width="600" height="" alt="alt_text" border="0" style="width: 100%; max-width: 600px; height: auto; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555; margin: auto; display: block;" class="g-img">
+                    </tr>
+                    <!-- Hero Image, Flush : END -->
+
+                    <!-- 1 Column Text + Button : BEGIN -->
+                    <tr>
+                        <td style="background-color: #ffffff;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555;">
+                                        <h2 style="margin: 0 0 10px 0; font-family: sans-serif; font-size: 18px; line-height: 22px; color: #333333; font-weight: bold; text-align: center;"> Good Morning! </h2>
+                                        <p style="margin: 0; text-align: center;">Here are your morning Minits for {DATE}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- 1 Column Text + Button : END -->
+
+                    <!-- 2 Even Columns : BEGIN -->
+                    <tr>
+                        <td style="padding: 0 10px 40px 10px; background-color: #ffffff;">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_1} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                   <a href={LINK_1} style="margin: 0;">{HEADLINE_1}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_2} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                    <a href={LINK_2} style="margin: 0;">{HEADLINE_2}</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- 2 Even Columns : END -->
+
+                    <!-- 2 Even Columns : BEGIN -->
+                    <tr>
+                        <td style="padding: 0 10px 40px 10px; background-color: #ffffff;">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_3} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                   <a href={LINK_3} style="margin: 0;">{HEADLINE_3}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_4} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                    <a href={LINK_4} style="margin: 0;">{HEADLINE_4}</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- 2 Even Columns : END -->
+
+                    <!-- 2 Even Columns : BEGIN -->
+                    <tr>
+                        <td style="padding: 0 10px 40px 10px; background-color: #ffffff;">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_5} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                   <a href={LINK_5} style="margin: 0;">{HEADLINE_5}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_6} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                    <a href={LINK_6} style="margin: 0;">{HEADLINE_6}</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- 2 Even Columns : END -->
+
+                    <!-- 2 Even Columns : BEGIN -->
+                    <tr>
+                        <td style="padding: 0 10px 40px 10px; background-color: #ffffff;">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_7} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                   <a href={LINK_7} style="margin: 0;">{HEADLINE_7}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td valign="top" width="50%">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="text-align: center; padding: 0 10px;">
+                                                    <img src={IMAGE_8} width="200" height="" alt="alt_text" border="0" style="width: 100%; max-width: 200px; background: #dddddd; font-family: sans-serif; font-size: 15px; line-height: 15px; color: #555555;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="text-align: left; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555; padding: 10px 10px 0;">
+                                                    <a href={LINK_8} style="margin: 0;">{HEADLINE_8}</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- 2 Even Columns : END -->
+                </table>
+                <!-- Email Body : END -->
+
+                <!-- Email Footer : BEGIN -->
+    	        <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: auto;">
+                    <tr>
+                        <td style="padding: 20px; font-family: sans-serif; font-size: 12px; line-height: 15px; text-align: center; color: #000;">
+                            <br><br>
+    						<span class="unstyle-auto-detected-links"> Made with 🖤 in Seattle</span>
+                            <br><br>
+                            <a href="mailto:morningminits@gmail.com?subject=Unsubscribe me!">Unsubscribe</a>
+                        </td>
+                    </tr>
+                </table>
+                <!-- Email Footer : END -->
+
+                <!--[if mso]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+            </div>
+
+        <!--[if mso | IE]>
+        </td>
+        </tr>
+        </table>
+        <![endif]-->
+        </center>
+    </body>
     </html>
     """
 
     for i in range(10):
         linkPlaceholder = '{LINK_' + str(i+1) + '}'
         headlinePlaceholder = '{HEADLINE_' + str(i+1) + '}'
+        imagePlaceholder = '{IMAGE_' + str(i+1) + '}'
+        datePlaceholder = '{DATE}'
 
         linkActual = str("\"" + str(articleUrls[i]) + "\"")
+        imageActual = str("\"" + str(articleImages[i]) + "\"")
         headlineActual = str(articleHeadlines[i])
 
+        html = html.replace(datePlaceholder, str((datetime.today() + timedelta(days=1)).strftime('%A %B %d')))
         html = html.replace(linkPlaceholder, linkActual)
         html = html.replace(headlinePlaceholder, headlineActual)
+        html = html.replace(imagePlaceholder, imageActual)
 
     part1 = MIMEText(html, "html")
 
