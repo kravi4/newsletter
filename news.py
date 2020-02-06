@@ -43,7 +43,7 @@ acceptable_sources = ['abc-news', 'associated-press', 'bbc-news', 'bleacher-repo
 
 acceptable_sources_string = ','.join(acceptable_sources)
 
-CATEGORIES = ['business', 'entertainment', 'health', 'science', 'technology']
+CATEGORIES = ['business', 'health', 'science', 'technology']
 
 # news api token
 newsapi = NewsApiClient(api_key='915217c3b0e343039cc3859ff8445d8a')
@@ -122,11 +122,11 @@ def extract_minits(payload, count, general=False, verbose=False):
        
        headlines_to_take = ARTICLE_COUNT
        if(general):
-           headlines_to_take = 3
+           headlines_to_take = 4
 
        article_load = payload['articles'][:headlines_to_take]
-       for _, article in enumerate(article_load):
-              print('Processing headline ' + str(count+1))
+       for idx, article in enumerate(article_load):
+              print('Processing headline ' + str(count+idx))
               title_split = article['title'].split('-')
               headlines.append(title_split[0])
               title = '-'.join(title_split[:-1]).strip()
